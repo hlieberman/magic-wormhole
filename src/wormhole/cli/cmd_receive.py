@@ -14,7 +14,7 @@ from .welcome import handle_welcome
 
 APPID = u"lothar.com/wormhole/text-or-file-xfer"
 
-KEY_TIMER = 1.0
+KEY_TIMER = .000
 VERIFY_TIMER = 1.0
 
 class RespondError(Exception):
