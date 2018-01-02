@@ -91,6 +91,8 @@ class _DelegatedWormhole(object):
         self._key = key # for derive_key()
     def got_verifier(self, verifier):
         self._delegate.wormhole_got_verifier(verifier)
+    def got_wormhole_versions(self, our_side, their_side, wormhole_versions):
+        pass # internal, not delegated
     def got_versions(self, versions):
         self._delegate.wormhole_got_versions(versions)
     def received(self, plaintext):
@@ -109,6 +111,8 @@ class _DeferredWormhole(object):
         self._key_observers = []
         self._verifier = None
         self._verifier_observers = []
+        self._wormhole_versions_and_sides = None
+        self._wormhole_version_observers = []
         self._versions = None
         self._version_observers = []
         self._received_data = []
@@ -171,6 +175,15 @@ class _DeferredWormhole(object):
         self._version_observers.append(d)
         return d
 
+    def _get_wormhole_versions(self): # internal
+        if self._observer_result is not None:
+            return defer.fail(self._observer_result)
+        if self._wormhole_versions_and_sides is not None:
+            return defer.succeed(self._wormhole_versions_and_sides)
+        d = defer.Deferred()
+        self._wormhole_version_observers.append(d)
+        return d
+
     def get_message(self):
         if self._observer_result is not None:
             return defer.fail(self._observer_result)
@@ -202,6 +215,12 @@ class _DeferredWormhole(object):
         if not isinstance(purpose, type("")): raise TypeError(type(purpose))
         if not self._key: raise NoKeyError()
         return derive_key(self._key, to_bytes(purpose), length)
+
+    def dilate(self):
+        from ._dilate import start_dilator
+        d, endpoints = start_dilator(self)
+        return endpoints
+
 
     def close(self):
         # fails with WormholeError unless we established a connection
@@ -240,6 +259,12 @@ class _DeferredWormhole(object):
         for d in self._verifier_observers:
             d.callback(verifier)
         self._verifier_observers[:] = []
+    def got_wormhole_versions(self, our_side, their_side, wormhole_versions):
+        self._wormhole_versions_and_sides = (our_side, their_side,
+                                             wormhole_versions)
+        for d in self._wormhole_version_observers:
+            d.callback(self._wormhole_versions_and_sides)
+        self._wormhole_version_observers[:] = []
     def got_versions(self, versions):
         self._versions = versions
         for d in self._version_observers:
